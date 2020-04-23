@@ -1,4 +1,7 @@
 use device_query::{DeviceQuery, DeviceState, Keycode};
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
 
 const NUM_KEYS: usize = 82;
 
@@ -9,8 +12,9 @@ fn main() {
     println!("Beginning to run... \nBest of luck!");
 
     // Keypress records
-    let mut keypress_count: [u32 ; NUM_KEYS] = [0 ; NUM_KEYS];
+    let mut keypress_count: [usize ; NUM_KEYS] = [0 ; NUM_KEYS];
 
+    // TODO: Use Hash map and resizeable arrays to store n-gram frequencies
     // Markov chain transition matrix
     let mut trans_mat = [[0_u32; NUM_KEYS] ; NUM_KEYS];
 
@@ -31,24 +35,23 @@ fn main() {
         // Foreach key currently pressed
         for key in &curr_keys {
 
-            // Add key to markov model
-            for prev in &prev_keys {
-                match conv.index_from_key(key) {
-                    Some(curr_index) => {
-                        match conv.index_from_key(prev) {
-                            Some(prev_index) => {
-                                trans_mat[prev_index][curr_index] += 1;
-                            },
-                            None => eprintln!("{:?} not found!", prev)
-                        };
-                    },
-                    None => eprintln!("{:?} not found!", key)
-                };
-
-            }
-
             // Acknowledge Keypress
             if !prev_keys.contains(key) {
+
+                // Add key to markov model
+                for prev in &prev_keys {
+                    match conv.index_from_key(key) {
+                        Some(curr_index) => {
+                            match conv.index_from_key(prev) {
+                                Some(prev_index) => {
+                                    trans_mat[prev_index][curr_index] += 1;
+                                },
+                                None => eprintln!("{:?} not found!", prev)
+                            };
+                        },
+                        None => eprintln!("{:?} not found!", key)
+                    };
+                }
 
                 // Increase the key counter
                 match conv.index_from_key(key) {
@@ -88,6 +91,30 @@ fn main() {
             };
         }
     }
+
+    let path = Path::new("out/trans_mat.csv");
+    let display = path.display();
+    let mut file = match File::create(&path) {
+        Ok(file) => file,
+        Err(e) => panic!("Couldn't create {}: {}", display, e)
+    };
+    let mut text = String::from(",");
+    for i in 0..NUM_KEYS {
+        text += &format!("{:?},", conv.key_from_index(i).unwrap());
+    }
+    text += "\n";
+    for (i, rows) in trans_mat.iter().enumerate() {
+        let mut line: String = format!("{:?},", conv.key_from_index(i).unwrap());
+        for freq in rows.iter() {
+            line += &format!("{},", freq);
+        }
+        line += "\n";
+        text += &line;
+    }
+    match file.write_all(text.as_bytes()) {
+        Ok(_) => println!("Wrote table to {}", display),
+        Err(e) => panic!("Couldn't write to {}: {}", display, e)
+    };
 
     // Clean up
     println!("So long and thanks for all the fish!");
@@ -189,7 +216,7 @@ impl Converter {
 
     /// Get the key from the index
     pub fn index_from_key(&self, key: &Keycode) -> Option<usize> {
-        for (other, index) in self.pairs.into_iter() {
+        for (other, index) in self.pairs.iter() {
             if other == key {
                 return Some(*index)
             }
