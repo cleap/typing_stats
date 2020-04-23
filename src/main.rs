@@ -19,7 +19,8 @@ fn main() {
     let mut trans_mat = [[0_u32; NUM_KEYS] ; NUM_KEYS];
 
     // Init previous keys vector
-    let mut prev_keys: Vec<Keycode> = Vec::new();
+    let mut prev_keys: Vec<Keycode> = Vec::new(); // Keys held in last loop
+    let mut prev_pressed: Vec<Keycode> = Vec::new(); // The last keys that were pressed
 
     // Temporary hotkey combination to exit keylogging gracefully
     let mut lctrl = false;
@@ -39,7 +40,7 @@ fn main() {
             if !prev_keys.contains(key) {
 
                 // Add key to markov model
-                for prev in &prev_keys {
+                for prev in &prev_pressed {
                     match conv.index_from_key(key) {
                         Some(curr_index) => {
                             match conv.index_from_key(prev) {
@@ -70,6 +71,12 @@ fn main() {
         }
 
         // Update previous keys
+        if curr_keys.len() > 0 {
+            prev_pressed = Vec::new();
+            for key in &curr_keys {
+                prev_pressed.push(key.clone());
+            }
+        }
         prev_keys = curr_keys;
 
         // Check for exit condition
